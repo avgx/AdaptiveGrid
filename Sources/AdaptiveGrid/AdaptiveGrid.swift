@@ -1,75 +1,43 @@
 import SwiftUI
 
-public enum AdaptiveGrid { }
 
-extension AdaptiveGrid {
-    public struct Constants {
-        public static var LongSide:  [Int] {
-            switch UIDevice.current.userInterfaceIdiom {
-            case .phone:
-                [1, 2, 3, 2, 3, 4, 5, 6, 7, 9]
-            case .pad:
-                [1, 2, 3, 2, 3, 4, 3, 5, 4, 4, 5, 5]
-            default:
-                [1, 2, 3, 2, 3, 4, 5, 6, 7, 9]
-            }
-        }
-        public static var ShortSide: [Int] {
-            switch UIDevice.current.userInterfaceIdiom {
-            case .phone:
-                [1, 1, 1, 2, 2, 2, 2, 3, 4, 5]
-            case .pad:
-                [1, 1, 1, 2, 2, 2, 3, 2, 3, 4, 4, 5]
-            default:
-                [1, 1, 1, 2, 2, 2, 2, 3, 4, 5]
-            }
+public struct AdaptiveGrid<Content: View>: View {
+    let dimensions: AdaptiveDimensions
+    let content: (Int) -> Content
+    
+    let column = GridItem(.flexible(minimum: 10, maximum: .infinity), spacing: 0, alignment: .center)
+    
+    public init(_ longSide: Int, _ shortSide: Int, @ViewBuilder content: @escaping (Int) -> Content) {
+        self.init(AdaptiveDimensions(longSide, shortSide), content: content)
+    }
+    
+    public init(_ dimensions: AdaptiveDimensions, @ViewBuilder content: @escaping (Int) -> Content) {
+        self.dimensions = dimensions
+        self.content = content
+    }
+    
+    public var body: some View {
+        GeometryReader { geometry in
+            let isLandscape = geometry.size.width > geometry.size.height
+            let columns = isLandscape ? dimensions.longSide : dimensions.shortSide
+            let rows = isLandscape ? dimensions.shortSide : dimensions.longSide
             
-        }
-        
-        public static var Count: [Int] {
-            zip(LongSide, ShortSide).map({ x, y in x*y })
+            let gridcolumns: [GridItem] = .init(repeating: column, count: columns)
+            let rowheight = geometry.size.height / CGFloat(rows)
+            Inner(dimensions: dimensions, columns: gridcolumns, rowheight: rowheight, content: content)
         }
     }
 }
 
-extension AdaptiveGrid {
-    public struct Grid<Content: View>: View {
-        let count: Int
-        let content: (Int) -> Content
-        
-        public init(count: Int, @ViewBuilder content: @escaping (Int) -> Content) {
-            self.count = count
-            self.content = content
-        }
-        
-        public var body: some View {
-            GeometryReader { geometry in
-                let i = Constants.Count.firstIndex(where: { $0 >= count }) ?? Constants.Count.last ?? 0
-                
-                let C = Constants.LongSide[i]
-                let R = Constants.ShortSide[i]
-                
-                let isLandscape = geometry.size.width > geometry.size.height
-                let columns = isLandscape ? C : R
-                let rows = isLandscape ? R : C
-                
-                let column = GridItem(.flexible(minimum: 10, maximum: .infinity), spacing: 0, alignment: .center)
-                let gridcolumns: [GridItem] = .init(repeating: column, count: columns)
-                let rowheight = geometry.size.height / CGFloat(rows)
-                Inner(count: count, columns: gridcolumns, rowheight: rowheight, content: content)
-            }
-        }
-    }
-}
 
 fileprivate struct Inner<Content: View>: View {
-    let count: Int
+    let dimensions: AdaptiveDimensions
     let columns: [GridItem]
     let rowheight: CGFloat
     let content: (Int) -> Content
     
-    init(count: Int, columns: [GridItem], rowheight: CGFloat, @ViewBuilder content: @escaping (Int) -> Content) {
-        self.count = count
+    init(dimensions: AdaptiveDimensions, columns: [GridItem], rowheight: CGFloat, @ViewBuilder content: @escaping (Int) -> Content) {
+        self.dimensions = dimensions
         self.columns = columns
         self.rowheight = rowheight
         self.content = content
@@ -77,7 +45,7 @@ fileprivate struct Inner<Content: View>: View {
     
     var body: some View {
         LazyVGrid(columns: columns, spacing: 0) {
-            ForEach(0..<count, id: \.self) { index in
+            ForEach(0..<dimensions.count, id: \.self) { index in
                 content(index)
                     .frame(height: rowheight)
                     .id(index)
@@ -86,31 +54,42 @@ fileprivate struct Inner<Content: View>: View {
     }
 }
 
-#Preview("3") {
+#Preview("4x3") {
     NavigationView {
-        AdaptiveGrid.Grid(count: 3) { index in
+        AdaptiveGrid(4, 3) { index in
             Color.red
                 .padding(4)
         }
     }
 }
 
-#Preview("6") {
-    AdaptiveGrid.Grid(count: 6) { index in
+#Preview("6x4") {
+    AdaptiveGrid(6, 4) { index in
+        ZStack {
+            Color.red
+                .padding(4)
+            Text("\(index)")
+                .foregroundStyle(.white)
+        }
+    }
+}
+
+#Preview("3x3") {
+    AdaptiveGrid(3, 3) { index in
         Color.red
             .padding(4)
     }
 }
 
-#Preview("9") {
-    AdaptiveGrid.Grid(count: 9) { index in
+#Preview("3x2") {
+    AdaptiveGrid(3, 2) { index in
         Color.red
             .padding(4)
     }
 }
 
-#Preview("24") {
-    AdaptiveGrid.Grid(count: 24) { index in
+#Preview("8x8") {
+    AdaptiveGrid(8, 8) { index in
         Color.red
             .padding(4)
     }
